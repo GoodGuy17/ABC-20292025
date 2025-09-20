@@ -1,0 +1,60 @@
+---
+- name: installation
+  hosts: all
+  become: yes
+  vars:
+    tf_output_file: "/home/ubuntu/tf-scripts/tf_output.txt"
+
+  tasks:
+    - name: curl,unzip
+      apt:
+        name:
+          - unzip
+          - curl
+          - git
+        state: present
+        update_cache: yes
+
+    - name: download terraform
+      get_url:
+        url: "https://releases.hashicorp.com/terraform/1.6.9/terraform_1.6.9_linux_amd64.zip"
+        dest: "/tmp/terraform.zip"
+        mode: '0644'
+
+    - name: extract terraform
+      unarchive:
+        src: "/tmp/terraform.zip"
+        dest: "/usr/local/bin/"
+        remote_src: yes
+        mode: '0755'
+
+    - name: clone the terraform repo
+      git:
+        repo: "https://github.com/GoodGuy17/terraform.git"
+        dest: "/home/ubuntu/tf-scripts"
+        version: "main"
+        force: yes
+
+    - name: initialize terraform
+      command: terraform init
+      args:
+        chdir: /home/ubuntu/tf-scripts
+
+    - name: apply terraform and store output
+      command: terraform apply -auto-approve
+      args:
+        chdir: /home/ubuntu/tf-scripts
+      register: tf_output
+
+    - name: Save Terraform output to file
+      copy:
+        content: "{{ tf_output.stdout }}"
+        dest: "{{ tf_output_file }}"
+
+    - name: Cleanup cloned repository and Terraform zip
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/home/ubuntu/tf-scripts"
+        - "/tmp/terraform.zip"
